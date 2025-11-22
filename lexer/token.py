@@ -1,8 +1,8 @@
 class Token:
-    def __init__(self, tipo, lexema, linha):
+    def __init__(self, type, lexeme, line):
         self.type = type
-        self.lexem = lexem
+        self.lexeme = lexeme
         self.line = line
 
     def __str__(self):
-        return f"Tipo: {self.type}\nLexema: {self.lexem}\nLinha: {self.line}\n"
+        return f"Tipo: {self.type}\nLexema: {self.lexeme}\nLinha: {self.line}\n"
