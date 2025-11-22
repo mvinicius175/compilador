@@ -1,0 +1,67 @@
+<program> ::= <block>
+
+Estrutura principal
+<block> ::= <variable_declaration>
+           | <conditional_command>
+           | <while_command>
+           | <function_declaration>
+           | <procedure_declaration>
+           | <procedure_call>
+           | <print_command>
+
+Comandos
+<conditional_command> ::= "if" "(" <expression> ")" "{" <block> "}" <else_part>
+<while_command> ::= "while" "(" <expression> ")" "{" <block> <unconditional_jump> "}"
+<print_command> ::= "print" "(" (<constant> | <variable_identifier>) ")" ";"
+
+Desvios
+<else_part> ::= "else" "{" <block> "}" | ε
+<unconditional_jump> ::= "break" ";" | "continue" ";" | ε
+
+Variáveis
+<type_specifier> ::= "int" | "bool"
+<variable_assignment> ::= "=" <expression>
+<variable_identifier> ::= "v" (<letter> | <digit>)+
+<variable_declaration> ::= <variable> ";"
+<variable> ::= <type_specifier> <variable_identifier> <variable_assignment>
+
+Expressões
+<expression> ::= <logical_expression>
+               | <arithmetic_expression>
+               | <boolean>
+               | <function_call>
+               | <digit>
+
+<logical_expression> ::= <term> <relational_operator> <term>
+<arithmetic_expression> ::= <term> <arithmetic_terms>
+<arithmetic_terms> ::= ε | <arithmetic_operator> <term>
+<term> ::= <variable_identifier> | <constant>
+
+Procedimentos
+<procedure_call> ::= <procedure_identifier> "(" <parameter_list> ")" ";"
+<procedure_identifier> ::= "p" (<letter> | <digit>)+
+<procedure_declaration> ::= "proc" <procedure_identifier> "(" <parameter_list> ")" "{" <block> "}"
+
+Funções
+<function_call> ::= <function_identifier> "(" <parameter_list> ")"
+<function_identifier> ::= "f" (<letter> | <digit>)+
+<function_declaration> ::= "func" <type_specifier> <function_identifier> "(" <function_block>
+<function_block> ::= <parameter_list> ")" "{" <block> "return" (<variable_identifier> | <constant> | <boolean>) ";" "}"
+
+Parâmetros
+<parameter_list> ::= <parameter_declaration> <more_parameters>
+<parameter_declaration> ::= <type_specifier> <variable_identifier>
+<more_parameters> ::= "," <parameter_list> | ε
+
+Terminais
+<letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<constant> ::= <digit> {<digit>}
+<boolean> ::= "true" | "false"
+
+Operadores
+<arithmetic_operator> ::= "+" | "-" | "*" | "/"
+<relational_operator> ::= "==" | "!=" | ">" | ">=" | "<" | "<="
+
+
+
