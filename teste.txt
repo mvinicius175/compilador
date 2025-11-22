@@ -1,0 +1,120 @@
+int vA = 10;
+int vB = 20;
+int vResultado = 0;
+int vContador = 0;
+
+int vTotalSoma = 0;
+
+func int fSomar(int vX, int vY) {
+    int vSoma = vX + vY;
+    return vSoma;
+}
+
+func bool fEhPositivo(int vNum) {
+    bool vResultado = vNum > 0;
+    return vResultado;
+}
+
+func int fCalcularDobro(int vNumero) {
+    int vDois = 2;
+    int vDobro = vNumero * vDois;
+    return vDobro;
+}
+
+func int fMaior(int vA, int vB) {
+    if (vA > vB) {
+        return vA;
+    } else {
+        return vB;
+    }
+}
+
+proc pImprimirMensagem(int vValor) {
+    print (vValor);
+}
+
+proc pContar(int vInicio, int vFim) {
+    while (vInicio <= vFim) {
+        print (vInicio);
+        int vUm = 1;
+        vInicio = vInicio + vUm;
+    }
+}
+
+vResultado = vA + vB;
+print (vResultado);
+
+vResultado = vA * vB;
+print (vResultado);
+
+int vSoma = fSomar(vA, vB);
+print (vSoma);
+
+if (vA < vB) {
+    print (vA);
+} else {
+    print (vB);
+}
+
+while (vContador < 5) {
+    int vTemporario = vContador + 1;
+    print (vTemporario);
+    vContador = vContador + 1;
+}
+
+pContar(1, 3);
+
+int vDobroSoma = fCalcularDobro(fSomar(vA, vB));
+print (vDobroSoma);
+
+bool vTeste = vA == vB;
+if (vTeste) {
+    print (vA);
+} else {
+    print (vB);
+}
+
+int vMaiorValor = fMaior(vA, vB);
+print (vMaiorValor);
+
+int vExpressao1 = vA + vB * 2;
+print (vExpressao1);
+
+bool vIgual = vA == 10;
+bool vDiferente = vA != vB;
+bool vMenor = vA < vB;
+bool vMaior = vA > 5;
+bool vMenorIgual = vA <= 10;
+bool vMaiorIgual = vB >= 20;
+
+func int fMultiplicarSeVerdadeiro(int vNumero, bool vCondicao) {
+    if (vCondicao) {
+        int vDois = 2;
+        int vResult = vNumero * vDois;
+        return vResult;
+    }
+    return vNumero;
+}
+
+int vTesteMultiplicacao = fMultiplicarSeVerdadeiro(5, true);
+print (vTesteMultiplicacao);
+
+int vDivisao = vB / vA;
+print (vDivisao);
+
+bool vVerdadeiro = true;
+bool vFalso = false;
+print (vVerdadeiro);
+print (vFalso);
+
+int vIndex = 0;
+int vUm = 1;
+while (vIndex < 10) {
+    if (vIndex == 5) {
+        vIndex = vIndex + vUm;
+        continue;
+    }
+    print (vIndex);
+    vIndex = vIndex + vUm;
+}
+
