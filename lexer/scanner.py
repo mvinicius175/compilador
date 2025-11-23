@@ -73,7 +73,7 @@ class Scanner:
             elif char.isalpha():
                 self._scan_identifier_or_keyword(keywords)
             else:
-                self.token_list.append(Token("ERROR", char, self.line))
+                self.token_list.append(Token("INVALID", char, self.line))
 
     def _match_double_char(self, expected_char, double_type, single_type):
         if self.lookAhead() == expected_char:
