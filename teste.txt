@@ -118,3 +118,16 @@ while (vIndex < 10) {
     vIndex = vIndex + vUm;
 }
 
+float vTaxa = 1.5;
+char vLetra = 'a';
+int vSemInit;
+vSemInit = 42;
+print (vTaxa + 2.5);
+print (vLetra);
+
+func void fMostrarValores(float vValor, char vChar) {
+    print (vValor);
+    print (vChar);
+}
+
+fMostrarValores(vTaxa, vLetra);
