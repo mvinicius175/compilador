@@ -25,9 +25,9 @@ def Main():
 
     try:
         parser = Parser(tokens)
-        success = parser.parse()
+        program_ast = parser.parse()
 
-        if success:
+        if program_ast is not None:
             print("Análise sintática e semântica concluída sem erros.")
 
     except SyntaxError as e:
