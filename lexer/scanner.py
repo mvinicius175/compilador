@@ -29,9 +29,9 @@ class Scanner:
         return '\0'
 
     def scan(self):
-        # Inicia a varredura e adiciona um token EOF ao final
+        # Inicia a varredura e adiciona um token FIM ao final
         self.scanTokens()
-        self.token_list.append(Token("EOF", "", self.line))
+        self.token_list.append(Token("FIM", "", self.line))
         return self.token_list
 
     def scanTokens(self):
