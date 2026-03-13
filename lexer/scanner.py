@@ -40,7 +40,8 @@ class Scanner:
             "if": "IF", "else": "ELSE", "while": "WHILE", "break": "BREAK",
             "continue": "CONTINUE", "print": "PRINT", "true": "TRUE",
             "false": "FALSE", "func": "FUNC", "proc": "PROC", "return": "RETURN",
-            "int": "TYPE_INT", "bool": "TYPE_BOOL"
+            "int": "TYPE_INT", "bool": "TYPE_BOOL", "float": "TYPE_FLOAT",
+            "char": "TYPE_CHAR", "void": "TYPE_VOID"
         }
         # Mapeamento de tokens simples de caractere único
         tokens_map = {
@@ -51,52 +52,65 @@ class Scanner:
 
         # Loop principal que percorre toda a entrada
         while self.current < len(self.program):
-            # marca o início do próximo lexema
             self.start = self.current
             char = self.nextChar()
 
-            # Ignora espaços e tabs e carriage return
             if char in ' \t\r':
                 pass
-            # Nova linha: incrementa número da linha
             elif char == '\n':
                 self.line += 1
-            # Tokens de caractere único (parênteses, operadores aritméticos simples, etc.)
+            elif char == "'":
+                self._scan_char_constant()
             elif char in tokens_map:
                 self.token_list.append(Token(tokens_map[char], char, self.line))
-            # '=' pode ser '==' (EQUAL) ou '=' (ATTR)
-            elif char == '=':
-                self._match_double_char('=', "EQUAL", "ATTR")
-            # '!' pode ser '!=' (NOT_EQUAL) ou '!' (NOT)
-            elif char == '!':
-                if self.lookAhead() == '=':
+            elif char == "=":
+                self._match_double_char("=", "EQUAL", "ATTR")
+            elif char == "!":
+                if self.lookAhead() == "=":
                     self.nextChar()
-                    self.token_list.append(Token("NOT_EQUAL", "!=", self.line))
+                    self.token_list.append(Token("NOTEQUAL", "!=" , self.line))
                 else:
-                    self.token_list.append(Token("NOT", "!", self.line))
-            # '<' e '<='
-            elif char == '<':
-                if self.lookAhead() == '=':
+                    self.token_list.append(Token("NOT", "!" , self.line))
+            elif char == "<":
+                if self.lookAhead() == "=":
                     self.nextChar()
-                    self.token_list.append(Token("LESS_EQUAL", "<=", self.line))
+                    self.token_list.append(Token("LESSEQUAL", "<=" , self.line))
                 else:
-                    self.token_list.append(Token("LESS", "<", self.line))
-            # '>' e '>='
-            elif char == '>':
-                if self.lookAhead() == '=':
+                    self.token_list.append(Token("LESS", "<" , self.line))
+            elif char == ">":
+                if self.lookAhead() == "=":
                     self.nextChar()
-                    self.token_list.append(Token("GREATER_EQUAL", ">=", self.line))
+                    self.token_list.append(Token("GREATEQUAL", ">=" , self.line))
                 else:
-                    self.token_list.append(Token("GREATER", ">", self.line))
-            # Início de número: consome dígitos
+                    self.token_list.append(Token("GREAT", ">" , self.line))
             elif char.isdigit():
                 self._scan_number()
-            # Início de identificador ou palavra-chave: consome letras/dígitos
             elif char.isalpha():
                 self._scan_identifier_or_keyword(keywords)
-            # Qualquer outro caractere é tratado como inválido
             else:
                 self.token_list.append(Token("INVALID", char, self.line))
+
+    def _scan_char_constant(self):
+        # Gramática: "'" <letter> "'"
+        if self.current >= len(self.program):
+            self.token_list.append(Token("INVALID", "'", self.line))
+            return
+
+        value = self.nextChar()
+        if value == "\n":
+            self.line += 1
+            self.token_list.append(Token("INVALID", "'", self.line))
+            return
+
+        if self.lookAhead() != "'":
+            # consome até achar fechamento ou fim
+            while self.current < len(self.program) and self.lookAhead() not in ["'", "\n"]:
+                self.nextChar()
+            self.token_list.append(Token("INVALID", self.program[self.start:self.current], self.line))
+            return
+
+        self.nextChar()  # consome "'"
+        self.token_list.append(Token("CHAR_CONST", value, self.line))
 
     def _match_double_char(self, expected_char, double_type, single_type):
         """
@@ -105,7 +119,7 @@ class Scanner:
         """
         if self.lookAhead() == expected_char:
             self.nextChar()
-            self.token_list.append(Token(double_type, expected_char * 2, self.line))
+            self.token_list.append(Token(double_type, f"{expected_char}{expected_char}", self.line))
         else:
             self.token_list.append(Token(single_type, expected_char, self.line))
 
@@ -113,8 +127,15 @@ class Scanner:
         # Consome todos os dígitos subsequentes para formar um número inteiro
         while self.lookAhead().isdigit():
             self.nextChar()
-        lexeme = self.program[self.start:self.current]
-        self.token_list.append(Token("NUMBER", lexeme, self.line))
+        if self.lookAhead() == "." and (self.current + 1) < len(self.program) and self.program[self.current + 1].isdigit():
+            self.nextChar()  # consome '.'
+            while self.lookAhead().isdigit():
+                self.nextChar()
+            lexeme = self.program[self.start:self.current]
+            self.token_list.append(Token("FLOAT_NUMBER", lexeme, self.line))
+        else:
+            lexeme = self.program[self.start:self.current]
+            self.token_list.append(Token("NUMBER", lexeme, self.line))
 
     def _scan_identifier_or_keyword(self, keywords):
         # Consome letras e dígitos que compõem o identificador ou palavra-chave
