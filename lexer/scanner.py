@@ -2,36 +2,36 @@ from lexer.token import Token
 
 class Scanner:
 
-    def __init__(self, program):
+    def __init__(self, programa):
         # Lista de tokens gerados
         self.token_list = []
         # Programa/entrada como string
-        self.program = program
+        self.programa = programa
         # índice do começo do lexema atual
-        self.start = 0
+        self.inicio = 0
         # índice do caractere atual sendo analisado
-        self.current = 0
+        self.atual = 0
         # número da linha atual (começa em 1)
-        self.line = 1
+        self.linha = 1
 
     def __str__(self):
         # Representação para depuração do estado atual do scanner
-        return f"Tokens: {self.token_list}, Inicio: {self.start}, Atual: {self.current}, Linha: {self.line}"
+        return f"Tokens: {self.token_list}, Inicio: {self.inicio}, Atual: {self.atual}, Linha: {self.linha}"
 
     def nextChar(self):
-        # Avança o ponteiro current e retorna o caractere anterior
-        self.current += 1
-        return self.program[self.current - 1]
+        # Avança o ponteiro atual e retorna o caractere anterior
+        self.atual += 1
+        return self.programa[self.atual - 1]
 
     def lookAhead(self):
-        if self.current < len(self.program):
-            return self.program[self.current]
+        if self.atual < len(self.programa):
+            return self.programa[self.atual]
         return '\0'
 
     def scan(self):
         # Inicia a varredura e adiciona um token FIM ao final
         self.scanTokens()
-        self.token_list.append(Token("FIM", "", self.line))
+        self.token_list.append(Token("FIM", "", self.linha))
         return self.token_list
 
     def scanTokens(self):
@@ -51,66 +51,66 @@ class Scanner:
         }
 
         # Loop principal que percorre toda a entrada
-        while self.current < len(self.program):
-            self.start = self.current
+        while self.atual < len(self.programa):
+            self.inicio = self.atual
             char = self.nextChar()
 
             if char in ' \t\r':
                 pass
             elif char == '\n':
-                self.line += 1
+                self.linha += 1
             elif char == "'":
                 self._scan_char_constant()
             elif char in tokens_map:
-                self.token_list.append(Token(tokens_map[char], char, self.line))
+                self.token_list.append(Token(tokens_map[char], char, self.linha))
             elif char == "=":
                 self._match_double_char("=", "EQUAL", "ATTR")
             elif char == "!":
                 if self.lookAhead() == "=":
                     self.nextChar()
-                    self.token_list.append(Token("NOTEQUAL", "!=" , self.line))
+                    self.token_list.append(Token("NOTEQUAL", "!=" , self.linha))
                 else:
-                    self.token_list.append(Token("NOT", "!" , self.line))
+                    self.token_list.append(Token("NOT", "!" , self.linha))
             elif char == "<":
                 if self.lookAhead() == "=":
                     self.nextChar()
-                    self.token_list.append(Token("LESSEQUAL", "<=" , self.line))
+                    self.token_list.append(Token("LESSEQUAL", "<=" , self.linha))
                 else:
-                    self.token_list.append(Token("LESS", "<" , self.line))
+                    self.token_list.append(Token("LESS", "<" , self.linha))
             elif char == ">":
                 if self.lookAhead() == "=":
                     self.nextChar()
-                    self.token_list.append(Token("GREATEQUAL", ">=" , self.line))
+                    self.token_list.append(Token("GREATEQUAL", ">=" , self.linha))
                 else:
-                    self.token_list.append(Token("GREAT", ">" , self.line))
+                    self.token_list.append(Token("GREAT", ">" , self.linha))
             elif char.isdigit():
                 self._scan_number()
             elif char.isalpha():
                 self._scan_identifier_or_keyword(keywords)
             else:
-                self.token_list.append(Token("INVALID", char, self.line))
+                self.token_list.append(Token("INVALID", char, self.linha))
 
     def _scan_char_constant(self):
         # Gramática: "'" <letter> "'"
-        if self.current >= len(self.program):
-            self.token_list.append(Token("INVALID", "'", self.line))
+        if self.atual >= len(self.programa):
+            self.token_list.append(Token("INVALID", "'", self.linha))
             return
 
         value = self.nextChar()
         if value == "\n":
-            self.line += 1
-            self.token_list.append(Token("INVALID", "'", self.line))
+            self.linha += 1
+            self.token_list.append(Token("INVALID", "'", self.linha))
             return
 
         if self.lookAhead() != "'":
             # consome até achar fechamento ou fim
-            while self.current < len(self.program) and self.lookAhead() not in ["'", "\n"]:
+            while self.atual < len(self.programa) and self.lookAhead() not in ["'", "\n"]:
                 self.nextChar()
-            self.token_list.append(Token("INVALID", self.program[self.start:self.current], self.line))
+            self.token_list.append(Token("INVALID", self.programa[self.inicio:self.atual], self.linha))
             return
 
         self.nextChar()  # consome "'"
-        self.token_list.append(Token("CHAR_CONST", value, self.line))
+        self.token_list.append(Token("CHAR_CONST", value, self.linha))
 
     def _match_double_char(self, expected_char, double_type, single_type):
         """
@@ -119,30 +119,30 @@ class Scanner:
         """
         if self.lookAhead() == expected_char:
             self.nextChar()
-            self.token_list.append(Token(double_type, f"{expected_char}{expected_char}", self.line))
+            self.token_list.append(Token(double_type, f"{expected_char}{expected_char}", self.linha))
         else:
-            self.token_list.append(Token(single_type, expected_char, self.line))
+            self.token_list.append(Token(single_type, expected_char, self.linha))
 
     def _scan_number(self):
         # Consome todos os dígitos subsequentes para formar um número inteiro
         while self.lookAhead().isdigit():
             self.nextChar()
-        if self.lookAhead() == "." and (self.current + 1) < len(self.program) and self.program[self.current + 1].isdigit():
+        if self.lookAhead() == "." and (self.atual + 1) < len(self.programa) and self.programa[self.atual + 1].isdigit():
             self.nextChar()  # consome '.'
             while self.lookAhead().isdigit():
                 self.nextChar()
-            lexeme = self.program[self.start:self.current]
-            self.token_list.append(Token("FLOAT_NUMBER", lexeme, self.line))
+            lexeme = self.programa[self.inicio:self.atual]
+            self.token_list.append(Token("FLOAT_NUMBER", lexeme, self.linha))
         else:
-            lexeme = self.program[self.start:self.current]
-            self.token_list.append(Token("NUMBER", lexeme, self.line))
+            lexeme = self.programa[self.inicio:self.atual]
+            self.token_list.append(Token("NUMBER", lexeme, self.linha))
 
     def _scan_identifier_or_keyword(self, keywords):
         # Consome letras e dígitos que compõem o identificador ou palavra-chave
         while self.lookAhead().isalpha() or self.lookAhead().isdigit():
             self.nextChar()
 
-        lexeme = self.program[self.start:self.current]
+        lexeme = self.programa[self.inicio:self.atual]
 
         # Se não for palavra reservada, classifica identificador pelo seu primeiro caractere:
         # - começa com 'f' -> função (ID_FUNC)
@@ -152,13 +152,13 @@ class Scanner:
         if lexeme not in keywords:
             first_char = lexeme[0].lower() if len(lexeme) > 0 else ''
             if first_char == "f":
-                self.token_list.append(Token("ID_FUNC", lexeme, self.line))
+                self.token_list.append(Token("ID_FUNC", lexeme, self.linha))
             elif first_char == "p":
-                self.token_list.append(Token("ID_PROC", lexeme, self.line))
+                self.token_list.append(Token("ID_PROC", lexeme, self.linha))
             elif first_char == "v":
-                self.token_list.append(Token("ID_VAR", lexeme, self.line))
+                self.token_list.append(Token("ID_VAR", lexeme, self.linha))
             else:
-                self.token_list.append(Token("INVALID", lexeme, self.line))
+                self.token_list.append(Token("INVALID", lexeme, self.linha))
         else:
             # É uma palavra reservada: usa o tipo correspondente do dicionário keywords
-            self.token_list.append(Token(keywords[lexeme], lexeme, self.line))
+            self.token_list.append(Token(keywords[lexeme], lexeme, self.linha))
