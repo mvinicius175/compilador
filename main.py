@@ -1,4 +1,5 @@
 from lexer.scanner import Scanner
+from parser.parser import Parser
 
 def Main():
     try:
@@ -8,17 +9,34 @@ def Main():
         print("Arquivo 'teste.txt' não encontrado!")
         return
 
+
     scanner = Scanner(codigo_exemplo)
-    tokens = scanner.scan()
 
-    with open('token_list.txt', 'w', encoding='utf-8') as output_file:
-        output_file.write("=== Lista de Tokens ===\n")
-        for i, token in enumerate(tokens, 1):
-            output_file.write(f"{i}. {token}\n")
-        output_file.write("=======================\n")
+    try:
+        tokens = scanner.scan()
+    except Exception as e:
+        print(f"Erro ao escanear o código: {e}")
+        return
 
-    total_tokens = len(tokens)
-    print(f"Total de tokens lidos: {total_tokens}")
-    print(f"Lista de tokens salva em 'token_list.txt'")
+    # print("=== Tokens Gerados ===")
+    # for token in tokens:
+    #     print(f"Tipo: {token.tipo}, Lexema: '{token.lexema}', Linha: {token.linha}")
+    # print("======================")
+
+    try:
+        parser = Parser(tokens)
+        success = parser.parse()
+
+        if success:
+            print("Análise sintática e semântica concluída sem erros.")
+
+    except SyntaxError as e:
+        print(f"Erro de sintaxe: {e}")
+        return
+    except Exception as e:
+        print(f"Erro semântico: {e}")
+        return
+
 if __name__ == "__main__":
     Main()
+
