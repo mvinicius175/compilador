@@ -1,3 +1,8 @@
+from typing import NoReturn
+
+from lexer.token import Token
+
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -14,16 +19,16 @@ class Parser:
         self.declared_variables = set()
         self.uninitialized_vars = set()
 
-    def current_token(self):
+    def current_token(self) -> Token | None:
         return self.tokens[self.current] if self.current < len(self.tokens) else None
 
-    def peek(self):
+    def peek(self) -> Token | None:
         # Retorna o próximo token sem avançar o índice.
         if self.current + 1 < len(self.tokens):
             return self.tokens[self.current + 1]
         return None
 
-    def match(self, expected_type):
+    def match(self, expected_type) -> Token | None:
         # Verifica se o token atual corresponde ao tipo esperado.
         token = self.current_token()
         if token and token.tipo == expected_type:
@@ -34,17 +39,23 @@ class Parser:
             self.error_sintatico(f"Caractere inválido encontrado: '{token.lexema}'")
         return None
 
-    def error_sintatico(self, message):
+    def error_sintatico(self, message) -> NoReturn:
         # Gera um erro de sintaxe com contexto.
         token = self.current_token()
         context = f"Na linha {token.linha} encontrou '{token.lexema}'" if token else "no final da entrada"
         raise SyntaxError(f"[Erro Sintático] {message} {context}")
 
-    def error_semantico(self, message):
+    def error_semantico(self, message) -> NoReturn:
         # Gera um erro semântico com contexto.
         token = self.current_token()
         context = f"Na linha {token.linha} encontrou '{token.lexema}'" if token else "no final da entrada"
         raise ValueError(f"[Erro Semântico] {message} {context}")
+
+    def require_current_token(self, message: str) -> Token:
+        token = self.current_token()
+        if token is None:
+            self.error_sintatico(message)
+        return token
 
     # ========================
     # Analisador Semântico
@@ -150,7 +161,8 @@ class Parser:
             self.check_unused_variables()
             self.check_uninitialized_vars()
 
-            if self.current_token() and self.current_token().tipo != "FIM":
+            token = self.current_token()
+            if token is not None and token.tipo != "FIM":
                 self.error_sintatico("Fim inesperado do parsing")
 
             return True
@@ -174,8 +186,10 @@ class Parser:
 
     def bloco(self):
         """Processa um bloco de código."""
-        while self.current_token():
+        while True:
             token = self.current_token()
+            if token is None:
+                break
 
             if token.tipo in ["RCBRACK", "FIM"]:
                 return True
@@ -198,11 +212,13 @@ class Parser:
                 if not self.match("SEMICOLON"):
                     self.error_sintatico("Esperado ';' após a chamada do procedimento.")
                 continue
-            elif self.chamada_funcao():
-                if not self.match("SEMICOLON"):
-                    self.error_sintatico("Esperado ';' após a chamada da função.")
-                continue
             else:
+                func_call = self.chamada_funcao()
+                if func_call is not None:
+                    if not self.match("SEMICOLON"):
+                        self.error_sintatico("Esperado ';' após a chamada da função.")
+                    continue
+
                 if token.tipo != "RCBRACK":
                     self.error_sintatico(f"Comando inválido: {token.lexema}")
                 break
@@ -213,8 +229,9 @@ class Parser:
         tipo = self.especificador_tipo()
         if not tipo:
             token = self.current_token()
-            if token and token.tipo == "ID_VAR":
-                if self.peek() and self.peek().tipo == "ATTR":
+            if token is not None and token.tipo == "ID_VAR":
+                next_token = self.peek()
+                if next_token is not None and next_token.tipo == "ATTR":
                     return self.atribuicao_variavel()
                 else:
                     self.error_semantico(f"Declaração de variável '{token.lexema}' na linha {token.linha} não é antecedida por um especificador de tipo.")
@@ -246,7 +263,8 @@ class Parser:
 
     def atribuicao_variavel(self):
         """Processa uma atribuição de variável marcando como inicializada."""
-        var_name = self.tokens[self.current].lexema
+        token = self.require_current_token("Esperado identificador de variável.")
+        var_name = token.lexema
 
         var_type = None
         for scope in reversed(self.scope_stack):
@@ -447,8 +465,10 @@ class Parser:
         """Processa um bloco verificando declarações de retorno."""
         has_return = False
 
-        while self.current_token():
+        while True:
             token = self.current_token()
+            if token is None:
+                break
 
             if token.tipo == "RCBRACK":
                 break
@@ -464,7 +484,8 @@ class Parser:
                 if expr_type != expected_return_type:
                     self.error_semantico(f"Tipo de retorno inválido: esperado '{expected_return_type}', encontrado '{expr_type}'.")
 
-                if self.current_token() and self.current_token().tipo != "RCBRACK":
+                token = self.current_token()
+                if token is not None and token.tipo != "RCBRACK":
                     if not self.match("SEMICOLON"):
                         self.error_sintatico("Esperado ';' após o retorno.")
 
@@ -482,15 +503,17 @@ class Parser:
                 continue
             elif self.chamada_procedimento():
                 continue
-            elif self.chamada_funcao():
-                if not self.match("SEMICOLON"):
-                    self.error_sintatico("Esperado ';' após a chamada da função.")
-                continue
             elif self.comando_impressao():
                 continue
             elif self.desvio_incondicional():
                 continue
             else:
+                func_call = self.chamada_funcao()
+                if func_call is not None:
+                    if not self.match("SEMICOLON"):
+                        self.error_sintatico("Esperado ';' após a chamada da função.")
+                    continue
+
                 break
 
         if expected_return_type != "void" and not has_return:
@@ -539,10 +562,11 @@ class Parser:
                 self.error_sintatico("Esperado '{' para abrir o bloco do 'else'.")
         return False
 
-    def lista_parametros(self):
+    def lista_parametros(self) -> list[dict[str, str]]:
         """Processa a lista de parâmetros marcando-os como inicializados."""
         params = []
-        if self.current_token() and self.current_token().tipo == "RBRACK":
+        token = self.current_token()
+        if token is not None and token.tipo == "RBRACK":
             return params
 
         while True:
@@ -648,6 +672,9 @@ class Parser:
     def termo(self):
         """Processa um termo (número, variável, chamada de função ou valor booleano)."""
         token = self.current_token()
+        if token is None:
+            self.error_sintatico("Esperado número, variável ou chamada de função, mas a entrada terminou.")
+
         if token.tipo == "NUMBER":
             self.match("NUMBER")
             return "int", None
@@ -667,12 +694,13 @@ class Parser:
             return var_type, None
         elif token.tipo == "ID_FUNC":
             # Chamada de função como parte de uma expressão
-            func_type, _ = self.chamada_funcao()
-            if func_type:
+            result = self.chamada_funcao()
+            if result is not None:
+                func_type, _ = result
                 return func_type, None
         self.error_sintatico(f"Esperado número, variável ou chamada de função, encontrado '{token.lexema}'.")
 
-    def chamada_funcao(self):
+    def chamada_funcao(self) -> tuple[str, None] | None:
         """Processa uma chamada de função e retorna o tipo de retorno e o temporário."""
         if self.match("ID_FUNC"):
             func_name = self.tokens[self.current - 1].lexema
@@ -704,11 +732,12 @@ class Parser:
                     self.error_sintatico("Esperado '(' após nome da função")
             else:
                 self.error_semantico(f"Função '{func_name}' não declarada")
-        return None, None
+        return None
 
-    def lista_argumentos(self):
+    def lista_argumentos(self) -> list[tuple[str, None]]:
         """Processa a lista de argumentos de uma função e retorna uma lista de tuplas (tipo, temp)."""
-        if self.current_token() and self.current_token().tipo == "RBRACK":  # Caso não haja argumentos
+        token = self.current_token()
+        if token is not None and token.tipo == "RBRACK":  # Caso não haja argumentos
             return []
 
         args = []
@@ -737,14 +766,18 @@ class Parser:
                     if self.match("RBRACK"):
                         if self.match("LCBRACK"):
                             # Processa o bloco até encontrar RCBRACK
-                            while self.current_token() and self.current_token().tipo != "RCBRACK":
+                            while True:
+                                token = self.current_token()
+                                if token is None or token.tipo == "RCBRACK":
+                                    break
+
                                 if not (self.declaracao_variavel() or
                                         self.comando_condicional() or
                                         self.comando_enquanto() or
                                         self.comando_impressao() or
                                         self.atribuicao_variavel() or
                                         self.desvio_incondicional()):
-                                    self.error_sintatico(f"Comando inválido no procedimento: {self.current_token().lexema}")
+                                    self.error_sintatico(f"Comando inválido no procedimento: {token.lexema}")
 
                             if self.match("RCBRACK"):
                                 self.exit_scope()
