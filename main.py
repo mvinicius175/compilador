@@ -28,6 +28,8 @@ def Main():
         program_ast = parser.parse()
 
         if program_ast is not None:
+            symbol_table_path = parser.save_symbol_table()
+            print(f"Tabela de símbolos salva em: {symbol_table_path}")
             print("Análise sintática e semântica concluída sem erros.")
 
     except SyntaxError as e:

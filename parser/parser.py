@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import NoReturn
+from pathlib import Path
+from typing import NoReturn, TypedDict
 
 from lexer.token import Token
 from parser.ast_nodes import (
@@ -27,6 +28,16 @@ from parser.ast_nodes import (
 )
 
 
+class SymbolEntry(TypedDict):
+    kind: str
+    name: str
+    type: str
+    scope_depth: int
+    initialized: bool
+    used: bool
+    line: int | None
+
+
 class Parser:
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
@@ -43,6 +54,7 @@ class Parser:
         self.declared_variables = set()
         self.uninitialized_vars = set()
         self.ast: ProgramNode | None = None
+        self.symbol_entries: list[SymbolEntry] = []
 
     def current_token(self) -> Token | None:
         return self.tokens[self.current] if self.current < len(self.tokens) else None
@@ -115,6 +127,19 @@ class Parser:
         if name in self.function_params or name in self.procedure_params:
             self.error_semantico(f"Identificador '{name}' já utilizado como função/procedimento.")
 
+        token = self.current_token()
+        self.symbol_entries.append(
+            {
+                "kind": "param" if is_param else "var",
+                "name": name,
+                "type": symbol_type,
+                "scope_depth": len(self.scope_stack) - 1,
+                "initialized": initialized or is_param,
+                "used": False,
+                "line": token.linha if token is not None else None,
+            }
+        )
+
         self.scope_stack[-1][name] = {
             "type": symbol_type,
             "initialized": initialized or is_param,
@@ -129,12 +154,54 @@ class Parser:
             if name in scope:
                 scope[name]["used"] = True
                 self.used_variables.add(name)
+                for entry in reversed(self.symbol_entries):
+                    scope_depth = int(entry["scope_depth"])
+                    if entry["name"] == name and scope_depth <= (len(self.scope_stack) - 1):
+                        entry["used"] = True
+                        break
                 if name in self.uninitialized_vars:
                     self.uninitialized_vars.remove(name)
                 if not scope[name]["initialized"]:
                     self.error_semantico(f"Variável '{name}' usada antes de ser inicializada.")
                 return scope[name]["type"]
         self.error_semantico(f"Identificador '{name}' não declarado.")
+
+    def save_symbol_table(self, file_path: str = "tabela_simbolos.txt") -> Path:
+        output = Path(file_path)
+        if not output.is_absolute():
+            output = Path.cwd() / output
+
+        lines: list[str] = ["=== TABELA DE SIMBOLOS ===", ""]
+
+        lines.append("[SIMBOLOS DECLARADOS]")
+        for entry in self.symbol_entries:
+            lines.append(
+                "- kind={kind}; name={name}; type={type}; scope={scope_depth}; "
+                "initialized={initialized}; used={used}; line={line}".format(**entry)
+            )
+
+        lines.append("")
+        lines.append("[FUNCOES]")
+        if self.function_params:
+            for function_name, function_info in self.function_params.items():
+                param_types = ", ".join(function_info["param_types"])
+                lines.append(
+                    f"- name={function_name}; return_type={function_info['return_type']}; params=[{param_types}]"
+                )
+        else:
+            lines.append("- (nenhuma)")
+
+        lines.append("")
+        lines.append("[PROCEDIMENTOS]")
+        if self.procedure_params:
+            for procedure_name, param_types in self.procedure_params.items():
+                params_text = ", ".join(param_types)
+                lines.append(f"- name={procedure_name}; params=[{params_text}]")
+        else:
+            lines.append("- (nenhum)")
+
+        output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return output
 
     def parse(self) -> ProgramNode | None:
         try:
