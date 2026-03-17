@@ -1,7 +1,7 @@
 from lexer.scanner import Scanner
 from parser.parser import Parser
 
-def Main():
+def main():
     try:
         with open('teste.txt', 'r') as file:
             codigo_exemplo = file.read()
@@ -40,5 +40,5 @@ def Main():
         return
 
 if __name__ == "__main__":
-    Main()
+    main()
 

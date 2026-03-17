@@ -64,6 +64,7 @@ class Parser:
             return self.tokens[self.current + 1]
         return None
 
+    # Verifica se o token atual corresponde ao tipo esperado e avança para o próximo token
     def match(self, expected_type: str) -> Token | None:
         token = self.current_token()
         if token is not None and token.tipo == expected_type:
@@ -84,6 +85,7 @@ class Parser:
         context = f"Na linha {token.linha} encontrou '{token.lexema}'" if token else "no final da entrada"
         raise ValueError(f"[Erro Semântico] {message} {context}")
 
+    # Verifica se o token atual existe, e se não, lança um erro sintático
     def require_current_token(self, message: str) -> Token:
         token = self.current_token()
         if token is None:
@@ -108,19 +110,7 @@ class Parser:
         if len(self.scope_stack) > 1:
             self.scope_stack.pop()
 
-    def verify_expression_types(self, left_type, right_type, operator):
-        if operator in ["+", "-", "*", "/"]:
-            if left_type not in ["int", "float"] or right_type not in ["int", "float"]:
-                self.error_semantico(f"Operação '{operator}' requer operandos numéricos, encontrados {left_type} e {right_type}")
-            return "float" if "float" in (left_type, right_type) else "int"
-
-        if operator in ["==", "!=", "<", "<=", ">", ">="]:
-            if left_type != right_type:
-                self.error_semantico(f"Operação de comparação '{operator}' requer operandos do mesmo tipo, encontrados {left_type} e {right_type}")
-            return "bool"
-
-        return None
-
+    # Verifica se um identificador já foi declarado no escopo atual ou como função/procedimento, e se não, adiciona-o à tabela de símbolos
     def add_symbol(self, name, symbol_type, initialized=False, is_param=False):
         if name in self.scope_stack[-1]:
             self.error_semantico(f"Identificador '{name}' já declarado no escopo atual.")
@@ -149,6 +139,7 @@ class Parser:
         if not initialized and not is_param:
             self.uninitialized_vars.add(name)
 
+    # Procura o tipo de um identificador, marcando-o como usado e verificando se foi inicializado antes do uso
     def get_symbol_type(self, name):
         for scope in reversed(self.scope_stack):
             if name in scope:
@@ -224,6 +215,7 @@ class Parser:
         print("Parsing completo sem erros.\n\n")
         return ProgramNode(statements=statements)
 
+    # Processa uma sequência de comandos até encontrar um token de parada (por exemplo, '}' ou 'FIM'), retornando a lista de nós de comando correspondentes
     def bloco(self, stop_tokens: set[str], expected_return_type: str | None = None) -> list[StatementNode]:
         statements: list[StatementNode] = []
 
@@ -237,6 +229,7 @@ class Parser:
                 self.error_sintatico(f"Comando inválido: {token.lexema}")
             statements.append(statement)
 
+    # Tenta processar cada tipo de comando possível, retornando o nó correspondente ao primeiro que for reconhecido. Se nenhum comando for reconhecido, retorna None
     def parse_statement(self, expected_return_type: str | None = None) -> StatementNode | None:
         statement = self.declaracao_variavel()
         if statement is not None:
