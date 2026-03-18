@@ -47,9 +47,6 @@ class Parser:
         self.function_return_type = None
         self.procedure_params = {}
         self.function_params = {}
-        self.temp_counter = 0
-        self.code = []
-        self.label_counter = 0
         self.used_variables = set()
         self.declared_variables = set()
         self.uninitialized_vars = set()
@@ -129,7 +126,7 @@ class Parser:
                 "line": token.linha if token is not None else None,
             }
         )
-
+        # Adiciona o símbolo ao escopo atual, marcando-o como inicializado se for um parâmetro (que é considerado inicializado por definição)
         self.scope_stack[-1][name] = {
             "type": symbol_type,
             "initialized": initialized or is_param,
@@ -139,7 +136,7 @@ class Parser:
         if not initialized and not is_param:
             self.uninitialized_vars.add(name)
 
-    # Procura o tipo de um identificador, marcando-o como usado e verificando se foi inicializado antes do uso
+    # Procura o tipo de um identificador percorrendo os escopos do mais interno para o mais externo, e se encontrado, marca-o como usado. Se o identificador não for encontrado, lança um erro semântico
     def get_symbol_type(self, name):
         for scope in reversed(self.scope_stack):
             if name in scope:
@@ -520,17 +517,6 @@ class Parser:
 
         return params
 
-    def declaracao_parametro(self):
-        tipo = self.especificador_tipo()
-        if not tipo:
-            self.error_sintatico("Esperado tipo do parâmetro.")
-
-        if self.match("ID_VAR"):
-            param_name = self.tokens[self.current - 1].lexema
-            self.add_symbol(param_name, tipo)
-            return True
-        return False
-
     def comando_retorno(self, expected_return_type: str) -> ReturnNode | None:
         if not self.match("RETURN"):
             return None
@@ -777,7 +763,3 @@ class Parser:
             return self.procedure_params[proc_name]
         self.error_semantico(f"Procedimento '{proc_name}' não declarado.")
 
-    def get_function_params(self, func_name):
-        if func_name in self.function_params:
-            return self.function_params[func_name]
-        self.error_semantico(f"Função '{func_name}' não declarada.")
