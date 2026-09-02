@@ -49,7 +49,6 @@ class Parser:
         self.function_params = {}
         self.used_variables = set()
         self.declared_variables = set()
-        self.uninitialized_vars = set()
         self.ast: ProgramNode | None = None
         self.symbol_entries: list[SymbolEntry] = []
 
@@ -92,63 +91,95 @@ class Parser:
     def enter_scope(self):
         self.scope_stack.append({})
 
+    def _warn_scope_issues(self, scope: dict) -> None:
+        for name, info in scope.items():
+            if name.startswith("_"):
+                continue
+            if not info["used"]:
+                print(f"[Aviso Semântico] Variável '{name}' declarada mas não utilizada")
+            if not info["initialized"]:
+                print(f"[Aviso Semântico] Variável '{name}' declarada mas nunca inicializada")
+
     def check_unused_variables(self):
         for scope in self.scope_stack:
-            for name, info in scope.items():
-                if not info["used"] and not name.startswith('_'):
-                    print(f"[Aviso Semântico] Variável '{name}' declarada mas não utilizada")
-
-    def check_uninitialized_vars(self):
-        for var in self.uninitialized_vars:
-            print(f"[Aviso Semântico] Variável '{var}' declarada mas nunca inicializada")
+            self._warn_scope_issues(scope)
 
     def exit_scope(self):
-        self.check_uninitialized_vars()
+        if self.scope_stack:
+            self._warn_scope_issues(self.scope_stack[-1])
         if len(self.scope_stack) > 1:
             self.scope_stack.pop()
 
-    # Verifica se um identificador já foi declarado no escopo atual ou como função/procedimento, e se não, adiciona-o à tabela de símbolos
-    def add_symbol(self, name, symbol_type, initialized=False, is_param=False):
+    def _current_symbol_entry(self, name: str, kinds: tuple[str, ...] = ("var", "param")) -> SymbolEntry | None:
+        current_depth = len(self.scope_stack) - 1
+        for entry in reversed(self.symbol_entries):
+            if entry["name"] != name or entry["kind"] not in kinds:
+                continue
+            if int(entry["scope_depth"]) <= current_depth:
+                return entry
+        return None
+
+    def _register_callable(self, kind: str, name: str, symbol_type: str, line: int | None) -> None:
+        self.symbol_entries.append(
+            {
+                "kind": kind,
+                "name": name,
+                "type": symbol_type,
+                "scope_depth": max(len(self.scope_stack) - 1, 0),
+                "initialized": True,
+                "used": False,
+                "line": line,
+            }
+        )
+
+    def mark_callable_used(self, name: str, kind: str) -> None:
+        for entry in reversed(self.symbol_entries):
+            if entry["name"] == name and entry["kind"] == kind:
+                entry["used"] = True
+                break
+
+    def add_symbol(self, name, symbol_type, initialized=False, is_param=False, line=None):
         if name in self.scope_stack[-1]:
             self.error_semantico(f"Identificador '{name}' já declarado no escopo atual.")
         if name in self.function_params or name in self.procedure_params:
             self.error_semantico(f"Identificador '{name}' já utilizado como função/procedimento.")
 
-        token = self.current_token()
+        kind = "param" if is_param else "var"
         self.symbol_entries.append(
             {
-                "kind": "param" if is_param else "var",
+                "kind": kind,
                 "name": name,
                 "type": symbol_type,
                 "scope_depth": len(self.scope_stack) - 1,
                 "initialized": initialized or is_param,
                 "used": False,
-                "line": token.linha if token is not None else None,
+                "line": line,
             }
         )
-        # Adiciona o símbolo ao escopo atual, marcando-o como inicializado se for um parâmetro (que é considerado inicializado por definição)
         self.scope_stack[-1][name] = {
             "type": symbol_type,
             "initialized": initialized or is_param,
             "used": False,
         }
         self.declared_variables.add(name)
-        if not initialized and not is_param:
-            self.uninitialized_vars.add(name)
 
-    # Procura o tipo de um identificador percorrendo os escopos do mais interno para o mais externo, e se encontrado, marca-o como usado. Se o identificador não for encontrado, lança um erro semântico
+    def mark_initialized(self, name: str) -> None:
+        for scope in reversed(self.scope_stack):
+            if name in scope:
+                scope[name]["initialized"] = True
+                break
+        entry = self._current_symbol_entry(name)
+        if entry is not None:
+            entry["initialized"] = True
+
     def get_symbol_type(self, name):
         for scope in reversed(self.scope_stack):
             if name in scope:
                 scope[name]["used"] = True
                 self.used_variables.add(name)
-                for entry in reversed(self.symbol_entries):
-                    scope_depth = int(entry["scope_depth"])
-                    if entry["name"] == name and scope_depth <= (len(self.scope_stack) - 1):
-                        entry["used"] = True
-                        break
-                if name in self.uninitialized_vars:
-                    self.uninitialized_vars.remove(name)
+                entry = self._current_symbol_entry(name)
+                if entry is not None:
+                    entry["used"] = True
                 if not scope[name]["initialized"]:
                     self.error_semantico(f"Variável '{name}' usada antes de ser inicializada.")
                 return scope[name]["type"]
@@ -191,21 +222,15 @@ class Parser:
         output.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return output
 
-    def parse(self) -> ProgramNode | None:
-        try:
-            self.ast = self.programa()
-            self.check_unused_variables()
-            self.check_uninitialized_vars()
+    def parse(self) -> ProgramNode:
+        self.ast = self.programa()
+        self.check_unused_variables()
 
-            token = self.current_token()
-            if token is not None and token.tipo != "FIM":
-                self.error_sintatico("Fim inesperado do parsing")
+        token = self.current_token()
+        if token is not None and token.tipo != "FIM":
+            self.error_sintatico("Fim inesperado do parsing")
 
-            return self.ast
-        except (SyntaxError, ValueError) as error:
-            print(f"\nErro encontrado: {error}")
-            self.ast = None
-            return None
+        return self.ast
 
     def programa(self) -> ProgramNode:
         statements = self.bloco(stop_tokens={"FIM"})
@@ -309,7 +334,7 @@ class Parser:
         if not self.match("SEMICOLON"):
             self.error_sintatico("Esperado ';' após a declaração da variável.")
 
-        self.add_symbol(identifier.lexema, tipo, initialized=initialized)
+        self.add_symbol(identifier.lexema, tipo, initialized=initialized, line=identifier.linha)
         return VariableDeclarationNode(var_type=tipo, name=identifier.lexema, initializer=initializer)
 
     def atribuicao_variavel(self) -> AssignmentNode | None:
@@ -333,13 +358,7 @@ class Parser:
         if expr_type != var_type:
             self.error_semantico(f"Atribuição inválida: esperado '{var_type}', encontrado '{expr_type}'.")
 
-        for scope in reversed(self.scope_stack):
-            if var_name in scope:
-                scope[var_name]["initialized"] = True
-                break
-
-        if var_name in self.uninitialized_vars:
-            self.uninitialized_vars.remove(var_name)
+        self.mark_initialized(var_name)
 
         if not self.match("SEMICOLON"):
             self.error_sintatico("Esperado ';' após a atribuição da variável.")
@@ -375,10 +394,12 @@ class Parser:
         if not self.match("LCBRACK"):
             self.error_sintatico("Esperado '{' para iniciar o bloco do 'if'.")
 
+        self.enter_scope()
         then_block = self.bloco(stop_tokens={"RCBRACK"}, expected_return_type=expected_return_type)
 
         if not self.match("RCBRACK"):
             self.error_sintatico("Esperado '}' para fechar o bloco do 'if'.")
+        self.exit_scope()
 
         else_block = self.else_opcional(expected_return_type)
         return IfNode(condition=condition, then_block=then_block, else_block=else_block)
@@ -390,9 +411,11 @@ class Parser:
         if not self.match("LCBRACK"):
             self.error_sintatico("Esperado '{' para abrir o bloco do 'else'.")
 
+        self.enter_scope()
         else_block = self.bloco(stop_tokens={"RCBRACK"}, expected_return_type=expected_return_type)
         if not self.match("RCBRACK"):
             self.error_sintatico("Esperado '}' para fechar o bloco do 'else'.")
+        self.exit_scope()
         return else_block
 
     def comando_enquanto(self, expected_return_type: str | None = None) -> WhileNode | None:
@@ -412,7 +435,9 @@ class Parser:
             self.error_sintatico("Esperado '{' para iniciar o bloco do 'while'.")
 
         self.loop_depth += 1
+        self.enter_scope()
         body = self.bloco(stop_tokens={"RCBRACK"}, expected_return_type=expected_return_type)
+        self.exit_scope()
         self.loop_depth -= 1
 
         if not self.match("RCBRACK"):
@@ -453,6 +478,7 @@ class Parser:
             self.error_semantico(f"Função/procedimento '{func_name}' já declarado.")
 
         self.function_params[func_name] = {"return_type": return_type, "param_types": []}
+        self._register_callable("func", func_name, return_type, identifier.linha)
         previous_return_type = self.function_return_type
         self.function_return_type = return_type
         self.enter_scope()
@@ -508,7 +534,7 @@ class Parser:
             if identifier is None:
                 self.error_sintatico("Esperado identificador do parâmetro.")
 
-            self.add_symbol(identifier.lexema, tipo, is_param=True)
+            self.add_symbol(identifier.lexema, tipo, is_param=True, line=identifier.linha)
             params.append(ParameterNode(param_type=tipo, name=identifier.lexema))
 
             if self.match("COMMA"):
@@ -643,6 +669,7 @@ class Parser:
         if func_name not in self.function_params:
             self.error_semantico(f"Função '{func_name}' não declarada")
 
+        self.mark_callable_used(func_name, "func")
         func_info = self.function_params[func_name]
         if not self.match("LBRACK"):
             self.error_sintatico("Esperado '(' após nome da função")
@@ -693,6 +720,7 @@ class Parser:
         if proc_name in self.procedure_params or proc_name in self.function_params:
             self.error_semantico(f"Função/procedimento '{proc_name}' já declarado.")
 
+        self._register_callable("proc", proc_name, "void", identifier.linha)
         self.enter_scope()
         if not self.match("LBRACK"):
             self.error_sintatico("Esperado '(' para iniciar a lista de parâmetros.")
@@ -723,6 +751,7 @@ class Parser:
             self.error_sintatico("Esperado '(' para iniciar os argumentos do procedimento.")
 
         expected_params = self.get_procedure_params(proc_name)
+        self.mark_callable_used(proc_name, "proc")
         actual_args = self.lista_argumentos()
         if len(actual_args) != len(expected_params):
             self.error_semantico(
